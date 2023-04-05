@@ -1,0 +1,385 @@
+---
+title: "MMA 860 Final R (Final Price)"
+author: "Team Eglinton"
+date: "13/04/2022"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+library("tidyverse")
+library("readxl")
+library("mice")
+library("car")
+library("caret")
+
+
+df1<-read_excel("C:\\Users\\Hassan\\Desktop\\Canada\\Queens\\Semesters\\Winter 2022\\MMA 860 Mgmt and Acq of Data\\Final Project\\Final Docs\\Condo_Data.xlsx")
+df2<-read_excel("C:\\Users\\Hassan\\Desktop\\Canada\\Queens\\Semesters\\Winter 2022\\MMA 860 Mgmt and Acq of Data\\Final Project\\Final Docs\\Age_Income.xlsx")
+summary(df1)
+summary(df2)
+
+#1) Data Cleaning
+
+df3<- df1[-c(1,2,8,13:16,18:20)]
+head(df3)
+str(df3)
+
+df3$final_price<-as.numeric(gsub("[$,]","",df3$final_price))
+df3$sqft<-as.numeric(df3$sqft)
+names(df3)[10]<-"Postal_Codes"
+df3$bedrooms<-substr(df3$bedrooms,1,1)
+df3$bathrooms<-substr(df3$bathrooms,1,1)
+df3$bedrooms<-as.numeric(df3$bedrooms)
+df3$bathrooms<-as.numeric(df3$bathrooms)
+str(df3)
+
+
+head(df2)
+df2<-df2[-c(1:3)]
+
+df4<-data.frame(t(df2))
+colnames(df4)<-df4[1,]
+df4<-df4[-1,]
+df4$Postal_Codes<-rownames(df4)
+names(df4)[43]<-"Total_income_Average_amount"
+rownames(df4)<-NULL
+df4$Postal_Codes<-substr(df4$Postal_Codes,1,3)
+df4[,1:43]<-lapply(df4[,1:43],as.numeric)
+head(df4)
+str(df4)
+
+#2) Feature Engineering
+
+final_df<-merge(x=df3,y=df4,by="Postal_Codes")
+final_df<-relocate(final_df,"Postal_Codes",.after = last_col())
+str(final_df)
+
+final_df$parkingdv<-ifelse(final_df$parking =="available",1,0)
+final_df$lockerdv<-ifelse(final_df$locker=="yes",1,0)
+final_df$balconydv<-ifelse(final_df$balcony=="yes",1,0)
+final_df$subwaydv<-ifelse(final_df$`close to subway`=="yes",1,0)
+final_df$dendv<-ifelse(final_df$den=="yes",1,0)
+
+
+reg_data<-select(final_df,final_price,bedrooms,bathrooms,sqft,parkingdv,lockerdv,balconydv,
+                 subwaydv,dendv,Male_0_to_04_years,Male_05_to_09_years,
+                 Male_10_to_14_years,Male_15_to_19_years,Male_20_to_24_years,
+                 Male_25_to_29_years,Male_30_to_34_years,Male_35_to_39_years,
+                 Male_40_to_44_years,Male_45_to_49_years,Male_50_to_54_years,
+                 Male_55_to_59_years,Male_60_to_64_years,Male_65_to_69_years,
+                 Male_70_to_74_years,Male_75_to_79_years,Male_80_to_84_years,
+                 Male_85_to_89_years,Male_90_to_94_years,Male_95_to_99_years,
+                 Male_100_years_and_over,Female_0_to_04_years,Female_05_to_09_years,
+                 Female_10_to_14_years,Female_15_to_19_years,Female_20_to_24_years,
+                 Female_25_to_29_years,Female_30_to_34_years,Female_35_to_39_years,
+                 Female_40_to_44_years,Female_45_to_49_years,Female_50_to_54_years,
+                 Female_55_to_59_years,Female_60_to_64_years,Female_65_to_69_years,
+                 Female_70_to_74_years,Female_75_to_79_years,Female_80_to_84_years,
+                 Female_85_to_89_years,Female_90_to_94_years,Female_95_to_99_years,
+                 Female_100_years_and_over,Total_income_Average_amount)
+
+
+#3) Train and Test Sampling
+set.seed(200)
+sample<-sample.int(n=nrow(reg_data), size = floor(0.7*nrow(reg_data)),replace = F)
+train_set<-reg_data[sample,]
+test_set<-reg_data[-sample,]
+
+#5) Model Building (TTT)
+
+reg<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+lockerdv+balconydv+dendv+
+               subwaydv+Male_0_to_04_years+Male_05_to_09_years+
+               Male_10_to_14_years+Male_15_to_19_years+Male_20_to_24_years+
+               Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+               Male_40_to_44_years+Male_45_to_49_years+Male_50_to_54_years+
+               Male_55_to_59_years+Male_60_to_64_years+Male_65_to_69_years+
+               Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+               Male_85_to_89_years+Male_90_to_94_years+Male_95_to_99_years+
+               Male_100_years_and_over+Female_0_to_04_years+Female_05_to_09_years+
+               Female_10_to_14_years+Female_15_to_19_years+Female_20_to_24_years+
+               Female_25_to_29_years+Female_30_to_34_years+Female_35_to_39_years+
+               Female_40_to_44_years+Female_45_to_49_years+Female_50_to_54_years+
+               Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+               Female_70_to_74_years+Female_75_to_79_years+Female_80_to_84_years+
+               Female_85_to_89_years+Female_90_to_94_years+Female_95_to_99_years+
+               Female_100_years_and_over+Total_income_Average_amount,train_set)
+
+#6 Assessing and Testing
+
+summary(reg)
+plot(reg)
+plot(density(resid(reg)))
+
+
+
+#7 Hypothesis Testing
+linearHypothesis(reg,c("lockerdv=0","balconydv=0","dendv=0","subwaydv=0","Male_15_to_19_years=0","Male_45_to_49_years=0","Male_60_to_64_years=0","Male_95_to_99_years=0","Male_100_years_and_over=0","Female_05_to_09_years=0","Female_10_to_14_years=0","Female_30_to_34_years=0","Female_45_to_49_years=0","Female_75_to_79_years=0","Female_100_years_and_over=0"))  
+
+reg2<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+
+           Male_0_to_04_years+Male_05_to_09_years+
+           Male_10_to_14_years+Male_20_to_24_years+
+           Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+           Male_40_to_44_years+Male_50_to_54_years+
+           Male_55_to_59_years+Male_65_to_69_years+
+           Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+           Male_85_to_89_years+Male_90_to_94_years+
+           Female_0_to_04_years+
+           Female_15_to_19_years+Female_20_to_24_years+
+           Female_25_to_29_years+Female_35_to_39_years+
+           Female_40_to_44_years+Female_50_to_54_years+
+           Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+           Female_70_to_74_years+Female_80_to_84_years+
+           Female_85_to_89_years+Female_90_to_94_years+Female_95_to_99_years+
+           Total_income_Average_amount,train_set)
+summary(reg2)
+
+linearHypothesis(reg2,c("Male_05_to_09_years=0","Male_55_to_59_years=0","Female_90_to_94_years=0"))
+
+
+reg3<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+
+           Male_0_to_04_years+
+           Male_10_to_14_years+Male_20_to_24_years+
+           Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+           Male_40_to_44_years+Male_50_to_54_years+
+           Male_65_to_69_years+
+           Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+           Male_85_to_89_years+Male_90_to_94_years+
+           Female_0_to_04_years+
+           Female_15_to_19_years+Female_20_to_24_years+
+           Female_25_to_29_years+Female_35_to_39_years+
+           Female_40_to_44_years+Female_50_to_54_years+
+           Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+           Female_70_to_74_years+Female_80_to_84_years+
+           Female_95_to_99_years+
+           Total_income_Average_amount,train_set)
+summary(reg3)
+
+
+pred<-predict(reg3,test_set)
+R2(pred,test_set$final_price)
+
+plot(reg3)
+plot(density(resid(reg3)))
+
+train_set1<-slice(train_set,-c(3299))
+reg4<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+
+           Male_0_to_04_years+
+           Male_10_to_14_years+Male_20_to_24_years+
+           Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+           Male_40_to_44_years+Male_50_to_54_years+
+           Male_65_to_69_years+
+           Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+           Male_85_to_89_years+Male_90_to_94_years+
+           Female_0_to_04_years+
+           Female_15_to_19_years+Female_20_to_24_years+
+           Female_25_to_29_years+Female_35_to_39_years+
+           Female_40_to_44_years+Female_50_to_54_years+
+           Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+           Female_70_to_74_years+Female_80_to_84_years+
+           Female_95_to_99_years+
+           Total_income_Average_amount,train_set1)
+summary(reg4)
+plot(reg4)
+
+train_set2<-slice(train_set1,-c(5453))
+reg5<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+
+           Male_0_to_04_years+
+           Male_10_to_14_years+Male_20_to_24_years+
+           Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+           Male_40_to_44_years+Male_50_to_54_years+
+           Male_65_to_69_years+
+           Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+           Male_85_to_89_years+Male_90_to_94_years+
+           Female_0_to_04_years+
+           Female_15_to_19_years+Female_20_to_24_years+
+           Female_25_to_29_years+Female_35_to_39_years+
+           Female_40_to_44_years+Female_50_to_54_years+
+           Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+           Female_70_to_74_years+Female_80_to_84_years+
+           Female_95_to_99_years+
+           Total_income_Average_amount,train_set2)
+summary(reg5)
+plot(reg5)
+plot(density(resid(reg5)))
+
+#8 Heteroskedasticity
+
+library(estimatr)
+ncvTest(reg5)
+
+
+robust_reg<-lm_robust(final_price~bedrooms+bathrooms+sqft+parkingdv+
+                        Male_0_to_04_years+
+                        Male_10_to_14_years+Male_20_to_24_years+
+                        Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+                        Male_40_to_44_years+Male_50_to_54_years+
+                        Male_65_to_69_years+
+                        Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+                        Male_85_to_89_years+Male_90_to_94_years+
+                        Female_0_to_04_years+
+                        Female_15_to_19_years+Female_20_to_24_years+
+                        Female_25_to_29_years+Female_35_to_39_years+
+                        Female_40_to_44_years+Female_50_to_54_years+
+                        Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+                        Female_70_to_74_years+Female_80_to_84_years+
+                        Female_95_to_99_years+
+                        Total_income_Average_amount,train_set2,se_type = "HC3")
+summary(robust_reg)
+
+pred1<-predict(robust_reg,test_set)
+R2(pred1,test_set$final_price)
+
+
+#9 Chow Test
+
+str(final_df)
+final_df$group<-ifelse(final_df$District=="Etobicoke","York",ifelse(final_df$District=="Scarborough","Toronto",ifelse(final_df$District=="North York", "York",ifelse(final_df$District=="East York","York",ifelse(final_df$District=="York","York","Toronto")))))
+
+final_df$York<-ifelse(final_df$group=="York",1,0)
+final_df$Toronto<-ifelse(final_df$group=="Toronto",1,0)
+
+
+chowtest_df<-select(final_df,final_price,bedrooms,bathrooms,sqft,parkingdv,
+                    Male_0_to_04_years,
+                      Male_10_to_14_years,Male_20_to_24_years,
+                      Male_25_to_29_years,Male_30_to_34_years,Male_35_to_39_years,
+                      Male_40_to_44_years,Male_50_to_54_years,
+                      Male_65_to_69_years,
+                      Male_70_to_74_years,Male_75_to_79_years,Male_80_to_84_years,
+                      Male_85_to_89_years,Male_90_to_94_years,
+                      Female_0_to_04_years,
+                      Female_15_to_19_years,Female_20_to_24_years,
+                      Female_25_to_29_years,Female_35_to_39_years,
+                      Female_40_to_44_years,Female_50_to_54_years,
+                      Female_55_to_59_years,Female_60_to_64_years,
+                    Female_65_to_69_years,
+                      Female_70_to_74_years,Female_80_to_84_years,
+                      Female_95_to_99_years,
+                    Total_income_Average_amount,York,Toronto)
+
+chowtest_df$a1<-chowtest_df$Toronto*chowtest_df$bedrooms
+chowtest_df$a2<-chowtest_df$Toronto*chowtest_df$bathrooms
+chowtest_df$a3<-chowtest_df$Toronto*chowtest_df$sqft
+chowtest_df$a4<-chowtest_df$Toronto*chowtest_df$parkingdv
+chowtest_df$a5<-chowtest_df$Toronto*chowtest_df$Male_0_to_04_years
+chowtest_df$a6<-chowtest_df$Toronto*chowtest_df$Male_10_to_14_years
+chowtest_df$a7<-chowtest_df$Toronto*chowtest_df$Male_20_to_24_years
+chowtest_df$a8<-chowtest_df$Toronto*chowtest_df$Male_25_to_29_years
+chowtest_df$a9<-chowtest_df$Toronto*chowtest_df$Male_30_to_34_years
+chowtest_df$a10<-chowtest_df$Toronto*chowtest_df$Male_35_to_39_years
+chowtest_df$a11<-chowtest_df$Toronto*chowtest_df$Male_40_to_44_years
+chowtest_df$a12<-chowtest_df$Toronto*chowtest_df$Male_50_to_54_years
+chowtest_df$a13<-chowtest_df$Toronto*chowtest_df$Male_65_to_69_years
+chowtest_df$a14<-chowtest_df$Toronto*chowtest_df$Male_70_to_74_years
+chowtest_df$a15<-chowtest_df$Toronto*chowtest_df$Male_75_to_79_years
+chowtest_df$a16<-chowtest_df$Toronto*chowtest_df$Male_80_to_84_years
+chowtest_df$a17<-chowtest_df$Toronto*chowtest_df$Male_85_to_89_years
+chowtest_df$a18<-chowtest_df$Toronto*chowtest_df$Male_90_to_94_years
+chowtest_df$a19<-chowtest_df$Toronto*chowtest_df$Female_0_to_04_years
+chowtest_df$a20<-chowtest_df$Toronto*chowtest_df$Female_15_to_19_years
+chowtest_df$a21<-chowtest_df$Toronto*chowtest_df$Female_20_to_24_years
+chowtest_df$a22<-chowtest_df$Toronto*chowtest_df$Female_25_to_29_years
+chowtest_df$a23<-chowtest_df$Toronto*chowtest_df$Female_35_to_39_years
+chowtest_df$a24<-chowtest_df$Toronto*chowtest_df$Female_40_to_44_years
+chowtest_df$a25<-chowtest_df$Toronto*chowtest_df$Female_50_to_54_years
+chowtest_df$a26<-chowtest_df$Toronto*chowtest_df$Female_55_to_59_years
+chowtest_df$a27<-chowtest_df$Toronto*chowtest_df$Female_60_to_64_years
+chowtest_df$a28<-chowtest_df$Toronto*chowtest_df$Female_65_to_69_years
+chowtest_df$a29<-chowtest_df$Toronto*chowtest_df$Female_70_to_74_years
+chowtest_df$a30<-chowtest_df$Toronto*chowtest_df$Female_80_to_84_years
+chowtest_df$a31<-chowtest_df$Toronto*chowtest_df$Female_95_to_99_years
+chowtest_df$a32<-chowtest_df$Toronto*chowtest_df$Total_income_Average_amount
+
+
+chowtest_reg<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+
+                   Male_0_to_04_years+
+                   Male_10_to_14_years+Male_20_to_24_years+
+                   Male_25_to_29_years+Male_30_to_34_years+Male_35_to_39_years+
+                   Male_40_to_44_years+Male_50_to_54_years+
+                   Male_65_to_69_years+
+                   Male_70_to_74_years+Male_75_to_79_years+Male_80_to_84_years+
+                   Male_85_to_89_years+Male_90_to_94_years+
+                   Female_0_to_04_years+
+                   Female_15_to_19_years+Female_20_to_24_years+
+                   Female_25_to_29_years+Female_35_to_39_years+
+                   Female_40_to_44_years+Female_50_to_54_years+
+                   Female_55_to_59_years+Female_60_to_64_years+Female_65_to_69_years+
+                   Female_70_to_74_years+Female_80_to_84_years+
+                   Female_95_to_99_years+
+                   Total_income_Average_amount+Toronto+a1+a2+a3+a4+a5+a6+
+                   a7+a8+a9+a10+a11+a12+a13+a14+a15+a16+a17+a18+a19+a20+a21+a22+a23+
+                   a24+a25+a26+a27+a28+a29+a30+a31+a32,chowtest_df)
+summary(chowtest_reg)
+
+
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+
+linearHypothesis(chowtest_reg,c("a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a27=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a28=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a29=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a30=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a31=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a32=0"))
+linearHypothesis(chowtest_reg,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a5=0","a6=0","a7=0","a8=0","a9=0","a10=0","a11=0","a12=0","a13=0","a14=0","a15=0","a16=0","a17=0","a18=0","a19=0","a20=0","a21=0","a22=0","a23=0","a24=0","a25=0","a26=0","a27=0","a28=0","a29=0","a30=0","a31=0"))
+
+
+
+chowtest_reg2<-lm(final_price~bedrooms+bathrooms+sqft+parkingdv+Toronto+a1+a2+a3+a4+a32,chowtest_df)
+summary(chowtest_reg2)
+linearHypothesis(chowtest_reg2,c("Toronto=0","a1=0","a2=0","a3=0","a4=0","a32=0"))
+
+linearHypothesis(chowtest_reg2,c("a1=0","a2=0","a3=0","a4=0","a32=0"))
+linearHypothesis(chowtest_reg2,c("Toronto=0","a2=0","a3=0","a4=0","a32=0"))
+linearHypothesis(chowtest_reg2,c("Toronto=0","a1=0","a3=0","a4=0","a32=0"))
+linearHypothesis(chowtest_reg2,c("Toronto=0","a1=0","a2=0","a4=0","a32=0"))
+linearHypothesis(chowtest_reg2,c("Toronto=0","a1=0","a2=0","a3=0","a32=0"))
+linearHypothesis(chowtest_reg2,c("Toronto=0","a1=0","a2=0","a3=0","a4=0"))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
